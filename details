@@ -1,0 +1,20 @@
+Transaction ID: random number -> 2 bytes
+Flags: 
+	1 bit for message: 0 is query
+	4 bits for operation code: 0 is standard query
+	1 bit flag for whether the message is truncated or not
+	1 bit flag for whether to do the query recursivly or not
+	1 bit reserved
+	1 bit flag for authenticated or not
+	4 bits just 0
+ -> 2 bytes
+Questions: 2 bytes in standard query the value is: 1
+Answer RRS: 2 bytes is 0 when question is set to 1
+Authority RRs: 2 bytes, value: 0
+Addtional RRs: 2 bytes, value: 0
+Queries: variable length:
+string representing the domain followed by a null character
+Type: 2 bytes, value: 1 for A Record
+Class: 2 bytes, value: 1 for IN
+
+Total Length is: 16 + strlen("Domain")
