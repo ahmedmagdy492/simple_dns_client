@@ -15,6 +15,7 @@
 #define DNS_SERVER "8.8.8.8"
 #define PORT 53
 #define DNS_STATIC_SIZE 17
+#define REC_SIZE 1024
 
 #pragma pack(1)
 
@@ -93,7 +94,6 @@ int copy(int write_start, char* dest, char* src) {
         write_start++;
     }
 
-    dest[write_start] = '\0';
     return write_start;
 }
 
@@ -107,7 +107,7 @@ char* create_labels_str(char** labels, int count, int labels_count) {
         buff_counter = copy(buff_counter, buffer, labels[i]);
     }
 
-    buffer[buff_counter] = '\0';
+    buffer[buff_counter] = 0;
 
     return buffer;
 }
@@ -140,7 +140,8 @@ void* create_packet(char* domain, int* packet_len) {
 
 	strncpy(offseted_buffer-1, labels_str, strlen(labels_str));
 
-	char* offseted_buffer2 = (offseted_buffer-1+strlen(labels_str)+1);
+	char* offseted_buffer2 = (offseted_buffer+strlen(labels_str));
+	(offseted_buffer+strlen(labels_str)-1)[0] = 0;
 	offseted_buffer2[0] = 0;
 	offseted_buffer2[1] = 1;
 	offseted_buffer2[2] = 0;
@@ -149,7 +150,7 @@ void* create_packet(char* domain, int* packet_len) {
 	return dns_buffer;
 }
 
-void send_dns_packet(char* domain) {
+void* send_dns_packet(char* domain, int* packet_len_out) {
 	int sock = socket(AF_INET, SOCK_DGRAM, 17);
 
 	if(sock < 0) {
@@ -180,11 +181,33 @@ void send_dns_packet(char* domain) {
 		exit(-1);
 	}
 
-	printf("Send DNS Standard Query Packet\n");
+	printf("Sent DNS Standard Query Packet\n");
+
+	printf("Waiting for an answer...\n");
+
+	char temp_buff[REC_SIZE];
+	memset(temp_buff, 0, REC_SIZE);
+
+	int msg_len = recvfrom(sock, temp_buff, REC_SIZE, MSG_WAITALL, 0, 0);
+	*packet_len_out = msg_len;
+
+	void* rec_buffer = malloc(sizeof(char)*msg_len);
+	memcpy(rec_buffer, temp_buff, msg_len);
 
 	close(sock);
 
 	free(packet);
+
+	return rec_buffer;
+}
+
+void extract_ip_address(void* dns_res_packet, int packet_len, char* output) {
+	unsigned char* ip = ((unsigned char*)dns_res_packet)+packet_len-4;
+
+	printf("%d.", ip[0]);
+	printf("%d.", ip[1]);
+	printf("%d.", ip[2]);
+	printf("%d\n", ip[3]);
 }
 
 int main(int argc, char* argv[]) {
@@ -193,5 +216,13 @@ int main(int argc, char* argv[]) {
 		return -1;
 	}
 	
-	send_dns_packet(argv[1]);
+	int packet_len = 0;
+	void* dns_res_packet = send_dns_packet(argv[1], &packet_len);
+	
+	char ip[16];
+	memset(ip, 0, 16);
+
+	extract_ip_address(dns_res_packet, packet_len, ip);
+
+	free(dns_res_packet);
 }
